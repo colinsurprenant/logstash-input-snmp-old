@@ -12,28 +12,30 @@ require_relative "snmp/client"
 class LogStash::Inputs::Snmp < LogStash::Inputs::Base
   config_name "snmp"
 
+  # List of OIDs for which we want to retrieve the scalar value
+  config :get,:validate => :array # [".1.3.6.1.2.1.1.1.0"]
 
-  # If undefined, Logstash will complain, even if codec is unused.
-  default :codec, "plain"
+  # List of OIDs for which we want to retrieve the subtree of information
+  config :walk,:validate => :array # [".1.3.6.1.2.1.1.1.0"]
 
-  config :oids_get,:validate => :array # [".1.3.6.1.2.1.1.1.0"]
-
-  config :oids_walk,:validate => :array # [".1.3.6.1.2.1.1.1.0"]
-
-  config :hosts, :validate => :array  #[ {"host" => "udp:127.0.0.1/161", "community" => "public"} ]
-
-  # config :retries, :validate => :integer, :default => 2
+  # List of hosts to query the configured `get` and `walk` options.
   #
-  # config :timeout, :validate => :integer, :default => 1000
+  # Each host definition is a hash and must define the `host` key and value.
+  #  `host` must use the format {tcp|udp}:{ip address}/{port}
+  #  for example `host => "udp:127.0.0.1/161"`
+  # Each host definition can optionally include the following keys and values:
+  #  `community` with a default value of `public`
+  #  `version` with a default value of `2c`
+  #  `retries` with a detault value of `2`
+  #  `timeout` with a default value of `1000`
+  config :hosts, :validate => :array  #[ {"host" => "udp:127.0.0.1/161", "community" => "public"} ]
 
   # Set polling interval
   #
   # The default, `1`, means poll each host every second.
   config :interval, :validate => :number, :default => 1
 
-  public
   def register
-
     # @host = Socket.gethostname
     validate_oids!
     validate_hosts!
@@ -48,14 +50,17 @@ class LogStash::Inputs::Snmp < LogStash::Inputs::Base
 
       definition = {
         :client => LogStash::SnmpClient.new(host_name, community, version, retries, timeout),
-        :get => Array(oids_get),
-        :walk => Array(oids_walk),
+        :get => Array(get),
+        :walk => Array(walk),
       }
       @client_definitions << definition
     end
   end
 
   def run(queue)
+
+    # for now a naive single threaded poller which sleeps for the given interval between
+    # each run. each run polls all the defined hosts for the get and walk options.
     while !stop?
       @client_definitions.each do |definition|
         result = {}
@@ -82,15 +87,15 @@ class LogStash::Inputs::Snmp < LogStash::Inputs::Base
 
   private
 
+  # TODO: implement
   def validate_oids!
-    puts("oids_get=#{oids_get.inspect}")
-    puts("oids_walk=#{oids_walk.inspect}")
-    # all good
+    # puts("get=#{get.inspect}")
+    # puts("walk=#{walk.inspect}")
   end
 
+  # TODO: implement
   def validate_hosts!
-    puts("hosts=#{hosts.inspect}")
-    # all good
+    # puts("hosts=#{hosts.inspect}")
 
     # raise(LogStash::ConfigurationError,  I18n.t(:plugin => "input", :type => "snmp", :error => "Configuration option 'hosts' is required"))
   end
