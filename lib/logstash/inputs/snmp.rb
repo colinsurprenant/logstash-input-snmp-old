@@ -41,7 +41,7 @@ class LogStash::Inputs::Snmp < LogStash::Inputs::Base
     validate_hosts!
 
     @client_definitions = []
-    hosts.each do |host|
+    @hosts.each do |host|
       host_name = host["host"]
       community = host["community"] || "public"
       version = host["version"] || "2c"
