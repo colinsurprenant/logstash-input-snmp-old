@@ -31,8 +31,16 @@ class LogStash::Inputs::Snmp < LogStash::Inputs::Base
   #  `timeout` in milliseconds with a default value of `1000`
   config :hosts, :validate => :array  #[ {"host" => "udp:127.0.0.1/161", "community" => "public"} ]
 
-  # List of paths of mib files of dirs. If a dir path is specified, all files with ".dic" extension will be loaded
-  config :mib_paths, :validate => :array
+  # List of paths of MIB .dic files of dirs. If a dir path is specified, all files with .dic extension will be loaded.
+  #
+  # ATTENTION: a MIB .dic file must be generated using the libsmi library `smidump` command line utility
+  # like this for example. Here the `RFC1213-MIB.txt` file is an ASN.1 MIB file.
+  #
+  # `$ smidump -k -f python RFC1213-MIB.txt > RFC1213-MIB.dic`
+  #
+  # The OSS libsmi library https://www.ibr.cs.tu-bs.de/projects/libsmi/ is available & installable
+  # on most OS.
+  config :mib_paths, :validate => :array # ["path/to/mib.dic", "path/to/mib/dir"]
 
   # Set polling interval in seconds
   #
@@ -40,7 +48,6 @@ class LogStash::Inputs::Snmp < LogStash::Inputs::Base
   config :interval, :validate => :number, :default => 30
 
   def register
-    # @host = Socket.gethostname
     validate_oids!
     validate_hosts!
 
@@ -68,7 +75,6 @@ class LogStash::Inputs::Snmp < LogStash::Inputs::Base
   end
 
   def run(queue)
-
     # for now a naive single threaded poller which sleeps for the given interval between
     # each run. each run polls all the defined hosts for the get and walk options.
     while !stop?

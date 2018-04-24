@@ -1,5 +1,5 @@
 require "java"
-require "logstash-input-snmp_jars"
+require "logstash-input-snmp_jars.rb"
 
 java_import "org.snmp4j.CommunityTarget"
 java_import "org.snmp4j.PDU"
