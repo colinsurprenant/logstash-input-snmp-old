@@ -4,6 +4,7 @@ require "logstash/namespace"
 require "stud/interval"
 require "socket" # for Socket.gethostname
 require_relative "snmp/client"
+require_relative "snmp/mib"
 
 # Generate a repeating message.
 #
@@ -30,15 +31,24 @@ class LogStash::Inputs::Snmp < LogStash::Inputs::Base
   #  `timeout` with a default value of `1000`
   config :hosts, :validate => :array  #[ {"host" => "udp:127.0.0.1/161", "community" => "public"} ]
 
+  # List of paths of mib files of dirs. If a dir path is specified, all files with ".dic" extension will be loaded
+  config :mib_paths, :validate => :array
+
   # Set polling interval
   #
   # The default, `1`, means poll each host every second.
-  config :interval, :validate => :number, :default => 1
+  config :interval, :validate => :number, :default => 30
 
   def register
     # @host = Socket.gethostname
     validate_oids!
     validate_hosts!
+
+    mib = LogStash::SnmpMib.new
+    Array(@mib_paths).each do |path|
+      # TODO handle errors
+      mib.add_mib_path(path)
+    end
 
     @client_definitions = []
     @hosts.each do |host|
@@ -49,7 +59,7 @@ class LogStash::Inputs::Snmp < LogStash::Inputs::Base
       timeout = host["timeout"] || 1000
 
       definition = {
-        :client => LogStash::SnmpClient.new(host_name, community, version, retries, timeout),
+        :client => LogStash::SnmpClient.new(host_name, community, version, retries, timeout, mib),
         :get => Array(get),
         :walk => Array(walk),
       }

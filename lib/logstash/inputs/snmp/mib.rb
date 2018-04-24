@@ -5,46 +5,77 @@ module LogStash
   end
 
   class SnmpMib
+    attr_reader :tree
 
     class Node
-      attr_reader :node_type, :module_name, :oid, oid_path, :childs
+      attr_reader :node_type, :name, :module_name, :oid, :oid_path, :childs
 
-      def inititalize(node_type, module_name, oid)
+      def initialize(node_type, name, module_name, oid)
         @node_type = node_type
+        @name = name
         @module_name = module_name
         @oid = oid
-        @oid_path = parse_oid(oid)
+        @oid_path = Node.parse_oid(oid)
         @childs = []
       end
 
-      private
-
-      def parse_oid(oid)
-        path = oid.split(".")
-        raise(SnmpMibError, "invalid oid '#{oid}'") if path.empty?
-        path
+      def self.parse_oid(oid)
+        oid.split(".").map(&:to_i)
       end
     end
 
     class Tree
       def initialize
-        @root = Node.new("root", "root", 0)
+        @root = Node.new("root", "root", nil, "")
       end
 
       def add_node(node)
         current = @root
 
-        node.oid_path.each do
-
+        last_node = node.oid_path.pop
+        node.oid_path.each do |i|
+          if current.childs[i].nil?
+            current.childs[i] = Node.new("path", "path", nil, "")
+          end
+          current = current.childs[i]
         end
+        if current.childs[last_node]
+          # TODO add to warnings handling
+          puts("overwriting oid=#{node.oid}")
+        end
+        current.childs[last_node] = node
+      end
+
+      def find_oid(oid)
+        path = Node.parse_oid(oid)
+
+        result = []
+        node = @root
+
+        loop do
+          break if path.empty?
+          i = path.shift
+
+          node = node.childs[i]
+
+          if node.nil?
+            result += path.unshift(i)
+            break
+          elsif node.name == "path"
+            result <<  i.to_s
+          else
+            result << node.name
+          end
+        end
+
+        result.join(".")
       end
     end
 
     def initialize
       @by_name = {}
       @by_oid = {}
-
-      @root_node = nil
+      @tree = Tree.new
     end
 
     # add a specific mib dic file or all mib dic files of the given directory to the current mib database
@@ -62,16 +93,22 @@ module LogStash
 
       warnings = []
       dic_files.each do |f|
-        module_name, name_hash, oid_hash = read_mib_dic(f)
+        module_name, name_hash, oid_hash, nodes = read_mib_dic(f)
+
         @by_name = @by_name.merge(name_hash) do |key, old, value|
           if (old != value)
             warnings << "warning: overwriting MIB name '#{key}' and OID '#{old}' with new OID '#{value}' from module '#{module_name}'"
           end
         end
+
         @by_oid = @by_oid.merge(oid_hash) do |key, old, value|
           if (old != value)
             warnings << "warning: overwriting MIB OID '#{key}' and name '#{old}' with new name '#{value}' from module '#{module_name}'"
           end
+        end
+
+        nodes.each do |k, v|
+          @tree.add_node(Node.new(v["nodetype"], k, v["moduleName"], v["oid"]))
         end
       end
 
@@ -101,11 +138,11 @@ module LogStash
       # oid_hash = name_hash.inject({}) { |result, (k, v)| result[v] = [module_name, k]; result }
       oid_hash = name_hash.invert
 
-      [module_name, name_hash, oid_hash]
+      [module_name, name_hash, oid_hash, nodes]
     end
 
     def find_oid(oid)
-      @by_oid[oid]
+      @tree.find_oid(oid)
     end
 
     def find_name(name)
