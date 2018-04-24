@@ -28,15 +28,15 @@ class LogStash::Inputs::Snmp < LogStash::Inputs::Base
   #  `community` with a default value of `public`
   #  `version` with a default value of `2c`
   #  `retries` with a detault value of `2`
-  #  `timeout` with a default value of `1000`
+  #  `timeout` in milliseconds with a default value of `1000`
   config :hosts, :validate => :array  #[ {"host" => "udp:127.0.0.1/161", "community" => "public"} ]
 
   # List of paths of mib files of dirs. If a dir path is specified, all files with ".dic" extension will be loaded
   config :mib_paths, :validate => :array
 
-  # Set polling interval
+  # Set polling interval in seconds
   #
-  # The default, `1`, means poll each host every second.
+  # The default, `30`, means poll each host every 30second.
   config :interval, :validate => :number, :default => 30
 
   def register
@@ -99,14 +99,11 @@ class LogStash::Inputs::Snmp < LogStash::Inputs::Base
 
   # TODO: implement
   def validate_oids!
-    # puts("get=#{get.inspect}")
-    # puts("walk=#{walk.inspect}")
+    # raise LogStash::ConfigurationError if any errors
   end
 
   # TODO: implement
   def validate_hosts!
-    # puts("hosts=#{hosts.inspect}")
-
-    # raise(LogStash::ConfigurationError,  I18n.t(:plugin => "input", :type => "snmp", :error => "Configuration option 'hosts' is required"))
+    # raise LogStash::ConfigurationError if any errors
   end
 end
